@@ -1,4 +1,5 @@
 import pytest
+
 from second_brain.config import Settings
 
 
