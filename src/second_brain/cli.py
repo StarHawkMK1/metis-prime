@@ -277,9 +277,13 @@ def status() -> None:
 
 @note_app.command("add")
 def note_add(
-    path: Annotated[str, typer.Argument(help="Relative path inside vault, e.g. wiki/concepts/foo.md")],
+    path: Annotated[
+        str, typer.Argument(help="Relative path inside vault, e.g. wiki/concepts/foo.md")
+    ],
     title: Annotated[str, typer.Option("--title", "-t", help="Page title (required)")],
-    page_type: Annotated[str, typer.Option("--type", help="Page type (default: concept)")] = "concept",
+    page_type: Annotated[
+        str, typer.Option("--type", help="Page type (default: concept)")
+    ] = "concept",
 ) -> None:
     """Create a new wiki page at the given vault-relative path."""
     from typing import cast
