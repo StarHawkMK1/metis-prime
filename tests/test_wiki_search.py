@@ -71,3 +71,19 @@ def test_search_result_fields(wiki_vault: Vault) -> None:
     assert r.score > 0
     assert "wiki/" in r.relative_path
     assert len(r.content) > 0
+
+
+def test_search_single_page(tmp_vault: Path) -> None:
+    vault = Vault(tmp_vault)
+    vault.write_page(
+        "wiki/concepts/only.md",
+        WikiPage(title="Only", type="concept", body="Neural networks deep learning."),
+    )
+    searcher = WikiSearcher(vault)
+    results = searcher.search("neural networks")
+    assert len(results) == 1
+
+
+def test_search_empty_query_returns_empty(wiki_vault: Vault) -> None:
+    results = WikiSearcher(wiki_vault).search("")
+    assert results == []

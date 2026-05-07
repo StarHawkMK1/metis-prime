@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from rank_bm25 import BM25Okapi
+from rank_bm25 import BM25Plus
 
 from ..storage.vault import Vault
 
@@ -37,7 +37,7 @@ class WikiSearcher:
                 contents.append("")
 
         tokenized = [doc.lower().split() for doc in contents]
-        bm25: Any = BM25Okapi(tokenized)
+        bm25: Any = BM25Plus(tokenized)
         scores: Any = bm25.get_scores(query.lower().split())
 
         ranked = sorted(
