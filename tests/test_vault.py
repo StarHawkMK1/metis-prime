@@ -1,6 +1,7 @@
 import pytest
 
 from second_brain.config import Settings
+from second_brain.storage.frontmatter import ProvenanceBreakdown, WikiPage
 
 
 def test_settings_defaults() -> None:
@@ -20,10 +21,6 @@ def test_settings_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_settings_vault_path_default() -> None:
     s = Settings()
     assert "second-brain-vault" in str(s.vault_path)
-
-
-from datetime import date
-from second_brain.storage.frontmatter import WikiPage, ProvenanceBreakdown
 
 
 def test_wiki_page_defaults() -> None:
