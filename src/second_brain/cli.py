@@ -6,11 +6,14 @@ from typing import Annotated
 import typer
 from rich.console import Console
 
+from .llm import LLMRouter
 from .storage.git_ops import init_repo
 
 app = typer.Typer(name="second-brain", help="Personal second brain CLI.")
 note_app = typer.Typer(help="Note management commands.")
+llm_app = typer.Typer(help="LLM router commands.")
 app.add_typer(note_app, name="note")
+app.add_typer(llm_app, name="llm")
 
 console = Console()
 
@@ -308,4 +311,64 @@ def note_add(
         console.print(f"[green]✓[/green] Created [bold]{written}[/bold]")
     except (RuntimeError, ValueError) as exc:
         console.print(f"[red]✗[/red] {exc}")
+        raise typer.Exit(1) from exc
+
+
+@llm_app.command("route")
+def llm_route(
+    task: Annotated[
+        str,
+        typer.Option(
+            "--task", "-t", help="Task type (ingest_summary|synthesis_complex|vision|lint_check)"
+        ),
+    ],
+    sensitivity: Annotated[
+        str,
+        typer.Option("--sensitivity", "-s", help="Sensitivity (normal|private)"),
+    ] = "normal",
+) -> None:
+    """Show which model would be selected for a given task/sensitivity (dry-run)."""
+    from typing import get_args
+
+    from .llm.policy import select_model
+    from .llm.types import Sensitivity, TaskType
+
+    valid_tasks = get_args(TaskType)
+    valid_sensitivities = get_args(Sensitivity)
+
+    if task not in valid_tasks:
+        console.print(f"[red]Invalid task[/red] '{task}'. Choose from: {', '.join(valid_tasks)}")
+        raise typer.Exit(1)
+
+    if sensitivity not in valid_sensitivities:
+        console.print(
+            f"[red]Invalid sensitivity[/red] '{sensitivity}'. "
+            f"Choose from: {', '.join(valid_sensitivities)}"
+        )
+        raise typer.Exit(1)
+
+    model = select_model(task, sensitivity)  # type: ignore[arg-type]
+    console.print(
+        f"[bold]Route:[/bold] task={task!r} sensitivity={sensitivity!r} → [green]{model}[/green]"
+    )
+
+
+@llm_app.command("test")
+def llm_test() -> None:
+    """Ping the LLM router with a fixed prompt (requires LiteLLM proxy running)."""
+    from .llm.errors import RouterError
+
+    router = LLMRouter()
+    try:
+        response = router.complete(
+            [{"role": "user", "content": "Reply with exactly: pong"}],
+            task_type="ingest_summary",
+            sensitivity="normal",
+        )
+        console.print(f"[green]✓[/green] Router responded: [bold]{response}[/bold]")
+    except RouterError as exc:
+        console.print(f"[red]✗[/red] Router error: {exc}")
+        raise typer.Exit(1) from exc
+    except Exception as exc:
+        console.print(f"[red]✗[/red] Unexpected error: {exc}")
         raise typer.Exit(1) from exc
