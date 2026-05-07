@@ -3,14 +3,26 @@ from __future__ import annotations
 from html.parser import HTMLParser
 from pathlib import Path
 
+_SKIP_TAGS: frozenset[str] = frozenset({"script", "style"})
+
 
 class _TextExtractor(HTMLParser):
     def __init__(self) -> None:
         super().__init__()
         self._parts: list[str] = []
+        self._skip: int = 0
+
+    def handle_starttag(self, tag: str, attrs: object) -> None:
+        if tag in _SKIP_TAGS:
+            self._skip += 1
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in _SKIP_TAGS and self._skip:
+            self._skip -= 1
 
     def handle_data(self, data: str) -> None:
-        self._parts.append(data)
+        if not self._skip:
+            self._parts.append(data)
 
     def get_text(self) -> str:
         return " ".join(self._parts).strip()
