@@ -13,10 +13,10 @@ class Vault:
     def _guard_raw(self, full_path: Path) -> None:
         try:
             rel = full_path.relative_to(self.path)
-            if rel.parts[0] == _RAW_TOP:
-                raise RuntimeError(f"Cannot write to raw/: {full_path}")
         except ValueError:
-            pass  # path outside vault — let pydantic/OS error naturally
+            raise ValueError(f"Path escapes vault: {full_path}") from None
+        if rel.parts[0] == _RAW_TOP:
+            raise RuntimeError(f"Cannot write to raw/: {full_path}")
 
     def write_page(self, relative_path: str, page: WikiPage) -> Path:
         full_path = self.path / relative_path
