@@ -1,7 +1,11 @@
+from pathlib import Path
+
+import pygit2
 import pytest
 
 from second_brain.config import Settings
 from second_brain.storage.frontmatter import ProvenanceBreakdown, WikiPage
+from second_brain.storage.git_ops import auto_commit, init_repo
 
 
 def test_settings_defaults() -> None:
@@ -59,3 +63,54 @@ def test_wiki_page_roundtrip() -> None:
 def test_provenance_breakdown_defaults() -> None:
     p = ProvenanceBreakdown()
     assert p.extracted + p.inferred + p.ambiguous == 100
+
+
+def test_init_repo_creates_git_directory(tmp_path: Path) -> None:
+    target = tmp_path / "repo"
+    target.mkdir()
+    init_repo(target)
+    assert (target / ".git").is_dir()
+
+
+def test_init_repo_head_is_born(tmp_path: Path) -> None:
+    target = tmp_path / "repo"
+    target.mkdir()
+    init_repo(target)
+    repo = pygit2.Repository(str(target))
+    assert not repo.head_is_unborn
+
+
+def test_init_repo_creates_initial_commit(tmp_path: Path) -> None:
+    target = tmp_path / "repo"
+    target.mkdir()
+    init_repo(target)
+    repo = pygit2.Repository(str(target))
+    commits = list(repo.walk(repo.head.target))
+    assert len(commits) == 1
+    assert "init" in commits[0].message
+
+
+def test_auto_commit_stages_file_and_commits(tmp_path: Path) -> None:
+    target = tmp_path / "repo"
+    target.mkdir()
+    init_repo(target)
+
+    test_file = target / "note.md"
+    test_file.write_text("hello", encoding="utf-8")
+    auto_commit(target, "test: add note", [test_file])
+
+    repo = pygit2.Repository(str(target))
+    commits = list(repo.walk(repo.head.target))
+    assert len(commits) == 2
+    assert commits[0].message == "test: add note"
+
+
+def test_auto_commit_noop_on_empty_paths(tmp_path: Path) -> None:
+    target = tmp_path / "repo"
+    target.mkdir()
+    init_repo(target)
+    # Should not raise and not create an extra commit
+    auto_commit(target, "noop", [])
+    repo = pygit2.Repository(str(target))
+    commits = list(repo.walk(repo.head.target))
+    assert len(commits) == 1
