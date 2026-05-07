@@ -225,6 +225,12 @@ def test_vault_archive_raw_commits(tmp_vault: Path) -> None:
     assert any("archive:" in c.message for c in commits)
 
 
+def test_vault_archive_raw_missing_file_raises(tmp_vault: Path) -> None:
+    vault = Vault(tmp_vault)
+    with pytest.raises(FileNotFoundError):
+        vault.archive_raw("raw/inbox/does-not-exist.md")
+
+
 def test_auto_commit_with_removed_paths(tmp_path: Path) -> None:
     from second_brain.storage.git_ops import auto_commit, init_repo
 

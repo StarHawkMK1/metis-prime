@@ -47,7 +47,15 @@ class Vault:
         return (self.path / relative_path).exists()
 
     def archive_raw(self, relative_path: str) -> Path:
-        """Move a raw file to raw/archived/ and commit the change."""
+        """Move a raw file to raw/archived/ and commit the change.
+
+        Raises FileNotFoundError if source does not exist.
+        Raises ValueError if relative_path escapes the vault boundary.
+        Raises FileExistsError if destination already exists (same filename archived twice).
+        """
+        resolved = (self.path / relative_path).resolve()
+        if not resolved.is_relative_to(self.path.resolve()):
+            raise ValueError(f"Path escapes vault boundary: {relative_path}")
         src = self.path / relative_path
         if not src.exists():
             raise FileNotFoundError(f"Raw file not found: {src}")
