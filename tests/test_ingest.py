@@ -125,6 +125,7 @@ def test_ingest_merge_decision_updates_page(tmp_vault: Path) -> None:
     assert result.wiki_path == "wiki/concepts/ai.md"
     updated = vault.read_page("wiki/concepts/ai.md")
     assert "New info about AI." in updated.body
+    assert updated.body.count("Initial content.") == 1
 
 
 def test_ingest_invalid_json_raises(tmp_vault: Path) -> None:

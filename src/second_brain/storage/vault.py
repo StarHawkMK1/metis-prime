@@ -46,7 +46,7 @@ class Vault:
         """Return True if a vault-relative page path exists on disk."""
         return (self.path / relative_path).exists()
 
-    def archive_raw(self, relative_path: str) -> Path:
+    def archive_raw(self, relative_path: str, commit_message: str | None = None) -> Path:
         """Move a raw file to raw/archived/ and commit the change.
 
         Raises FileNotFoundError if source does not exist.
@@ -63,9 +63,10 @@ class Vault:
         dst_dir.mkdir(parents=True, exist_ok=True)
         dst = dst_dir / src.name
         src.rename(dst)
+        msg = commit_message if commit_message is not None else f"archive: {src.name}"
         auto_commit(
             self.path,
-            f"archive: {src.name}",
+            msg,
             [dst],
             removed_paths=[src],
         )

@@ -44,6 +44,7 @@ Decision rules:
 - "create" — topic is new, no sufficiently similar wiki page exists.
 - "merge"  — a very similar page already exists; merge this content into it.
              Set target_page to the stem (filename without extension) of that page.
+             body: return the COMPLETE final merged body (not just new content).
 - "skip"   — source adds nothing new to the wiki.
 
 Constraints:
@@ -148,7 +149,8 @@ class IngestAgent:
             wiki_path = _resolve_merge_target(decision.target_page, self._vault)
             if wiki_path:
                 existing = self._vault.read_page(wiki_path)
-                merged_body = existing.body.rstrip() + "\n\n" + decision.body
+                # Trust the LLM to return the complete merged body as instructed.
+                merged_body = decision.body
                 merged_sources = list(dict.fromkeys(existing.sources + [source_rel_path]))
                 updated = existing.model_copy(
                     update={
@@ -173,13 +175,16 @@ class IngestAgent:
         else:
             log.info("ingest.skipped", source=source_rel_path)
 
-        archived = self._vault.archive_raw(source_rel_path)
-
-        # Emit a single ingest-level summary commit so history is traceable.
-        _commit_ingest_marker(
-            self._vault.path,
-            f"ingest: {decision.decision} {source_path.name}",
-        )
+        try:
+            archived = self._vault.archive_raw(
+                source_rel_path,
+                commit_message=f"ingest: {decision.decision} {source_path.name}",
+            )
+        except FileExistsError as exc:
+            raise IngestError(
+                f"Cannot archive {source_rel_path}: a file with that name already exists in "
+                f"raw/archived/. Rename the source file and retry. Original error: {exc}"
+            ) from exc
 
         return IngestResult(
             decision=decision.decision,
@@ -213,6 +218,8 @@ def _parse_decision(raw: str) -> _IngestDecision:
 
 def _default_wiki_path(title: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+    if not slug:
+        raise IngestError(f"Cannot slugify title: {title!r}")
     return f"wiki/concepts/{slug}.md"
 
 
@@ -231,22 +238,3 @@ def _body_with_related(body: str, wikilinks: list[str]) -> str:
         return body
     links = "\n".join(f"[[{stem}]]" for stem in wikilinks)
     return body.rstrip() + "\n\n## Related\n\n" + links
-
-
-def _commit_ingest_marker(repo_path: Path, message: str) -> None:
-    """Create a no-tree-change commit to mark the ingest operation in git history."""
-    repo = pygit2.Repository(str(repo_path))
-    sig = _get_signature(repo)
-    # Re-use the current HEAD tree (no new file changes; write/archive commits already recorded)
-    head_commit = repo.get(repo.head.target)
-    if head_commit is None:
-        raise RuntimeError("Repository has no HEAD commit")
-    tree = head_commit.tree
-    repo.create_commit(
-        "refs/heads/main",
-        sig,
-        sig,
-        message,
-        tree.id,
-        [repo.head.target],
-    )
