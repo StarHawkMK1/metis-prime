@@ -3,8 +3,9 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
-from second_brain.cli import app
 from typer.testing import CliRunner
+
+from second_brain.cli import app
 
 runner = CliRunner()
 

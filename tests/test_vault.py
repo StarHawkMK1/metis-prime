@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pygit2
 import pytest
+
 from second_brain.config import Settings
 from second_brain.storage.frontmatter import ProvenanceBreakdown, WikiPage
 from second_brain.storage.git_ops import auto_commit, init_repo

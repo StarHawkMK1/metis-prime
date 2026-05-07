@@ -43,6 +43,9 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["second_brain"]
+
 [tool.mypy]
 strict = true
 python_version = "3.11"

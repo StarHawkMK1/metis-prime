@@ -4,6 +4,7 @@ from itertools import product
 from typing import get_args
 
 import pytest
+
 from second_brain.llm.errors import PrivacyViolationError
 from second_brain.llm.policy import LOCAL_MODELS, assert_local_or_raise, select_model
 from second_brain.llm.types import Sensitivity, TaskType
@@ -60,6 +61,6 @@ def test_private_sensitivity_always_selects_local_model(task_type: str, sensitiv
     """PERMANENT: private sensitivity must always route to a local model."""
     model = select_model(task_type, sensitivity)  # type: ignore[arg-type]
     if sensitivity == "private":
-        assert (
-            model in LOCAL_MODELS
-        ), f"PRIVACY VIOLATION: {task_type!r} + private → {model!r} (not in LOCAL_MODELS)"
+        assert model in LOCAL_MODELS, (
+            f"PRIVACY VIOLATION: {task_type!r} + private → {model!r} (not in LOCAL_MODELS)"
+        )

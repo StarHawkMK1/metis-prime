@@ -3,6 +3,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from second_brain.config import Settings
 from second_brain.llm.errors import RouterError
 from second_brain.llm.metrics import MetricsRecorder
