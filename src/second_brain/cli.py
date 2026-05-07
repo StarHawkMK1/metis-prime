@@ -194,26 +194,37 @@ To add a new tag: append to the relevant section and commit.
 _ROUTING_POLICY_MD = """\
 # Routing Policy
 
-Routing policy is configured in Phase 2 (LLM Router). See SPEC §5.2.
+Routing is governed by `task_type` and `sensitivity`. The policy is enforced in two layers:
+1. `policy.select_model(task_type, sensitivity)` → selects logical model name
+2. `policy.assert_local_or_raise(model, sensitivity)` → defense-in-depth guard
 
-## Phase 1 Behavior
+## Model Assignments
 
-No LLM routing is active in Phase 1. All LLM calls raise `NotImplementedError`.
+| Task type               | Sensitivity | Model        | Reason                         |
+|-------------------------|-------------|--------------|--------------------------------|
+| ingest_summary          | normal      | bulk         | High volume, cost-sensitive    |
+| ingest_summary          | private     | local-fast   | Privacy override               |
+| synthesis_complex       | normal      | smart-cloud  | Quality matters most           |
+| synthesis_complex       | private     | local-fast   | Privacy override               |
+| vision                  | normal      | vision-cheap | Multimodal capability          |
+| vision                  | private     | local-fast   | Privacy override               |
+| lint_check              | normal      | bulk         | High volume, cost-sensitive    |
+| lint_check              | private     | local-fast   | Privacy override               |
 
-## Invariant (enforced from Phase 2 onward)
+## Logical Model Definitions
 
-Any page or request tagged `private` MUST NOT be sent to a cloud API.
-This is enforced at the router layer and has a permanent unit test.
+| Logical Name  | Provider   | Model ID              | Port  |
+|---------------|------------|-----------------------|-------|
+| local-fast    | vLLM       | Qwen3-8B-Instruct-AWQ | 8000  |
+| smart-cloud   | Anthropic  | claude-opus-4-7       | cloud |
+| vision-cheap  | Google     | gemini-2.5-pro        | cloud |
+| bulk          | OpenAI     | gpt-5-mini            | cloud |
 
-## Phase 2 Model Assignments
+## Invariant
 
-| Task type              | Model       |
-|------------------------|-------------|
-| ingest_summary (normal)| bulk        |
-| ingest_summary (private)| local-fast |
-| synthesis_complex      | smart-cloud |
-| vision                 | vision-cheap|
-| lint_check             | bulk        |
+Any request with `sensitivity=private` MUST route to `local-fast`.
+This is enforced at the router layer with a permanent property test.
+`local_only=True` causes cloud-routed tasks to RAISE (not silently downgrade).
 """
 
 _CHANGELOG_MD = """\
