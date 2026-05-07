@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pytest
-
 from second_brain.storage.git_ops import init_repo
 
 

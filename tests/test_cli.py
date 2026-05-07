@@ -16,11 +16,21 @@ def test_init_creates_vault_directory_structure(tmp_path: Path) -> None:
 
     # SPEC §4: all required vault subdirectories
     for subdir in [
-        "wiki/concepts", "wiki/projects", "wiki/people",
-        "wiki/places", "wiki/refs", "wiki/maps",
-        "raw/inbox", "raw/clips", "raw/transcripts",
-        "raw/screenshots", "raw/archived",
-        "tasks", "journal", "graph", "_meta",
+        "wiki/concepts",
+        "wiki/projects",
+        "wiki/people",
+        "wiki/places",
+        "wiki/refs",
+        "wiki/maps",
+        "raw/inbox",
+        "raw/clips",
+        "raw/transcripts",
+        "raw/screenshots",
+        "raw/archived",
+        "tasks",
+        "journal",
+        "graph",
+        "_meta",
     ]:
         assert (vault / subdir).is_dir(), f"Missing: {subdir}"
 
