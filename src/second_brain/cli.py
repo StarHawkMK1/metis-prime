@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -229,7 +230,7 @@ Day-to-day content edits are tracked by `git log`.
 
 @app.command()
 def init(
-    vault_path: Path = typer.Argument(..., help="Path where the new vault will be created."),
+    vault_path: Annotated[Path, typer.Argument(help="Path where the new vault will be created.")],
 ) -> None:
     """Initialize a new vault with directory structure, meta files, and git repo."""
     vault_path = vault_path.expanduser().resolve()
