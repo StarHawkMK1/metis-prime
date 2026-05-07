@@ -1,0 +1,48 @@
+model_list:
+  # Local model — forced for privacy=private
+  - model_name: local-fast
+    litellm_params:
+      model: openai/qwen3-local
+      api_base: http://localhost:8000/v1
+      api_key: dummy
+      max_tokens: 4096
+
+  # Complex synthesis — highest quality
+  - model_name: smart-cloud
+    litellm_params:
+      model: anthropic/claude-opus-4-7
+      # Uses ANTHROPIC_API_KEY env var automatically
+
+  # Multimodal (image + text)
+  - model_name: vision-cheap
+    litellm_params:
+      model: gemini/gemini-2.5-pro
+      # Uses GEMINI_API_KEY env var automatically
+
+  # High-volume, low-cost (summaries, classification)
+  - model_name: bulk
+    litellm_params:
+      model: openai/gpt-5-mini
+      # Uses OPENAI_API_KEY env var automatically
+
+router_settings:
+  routing_strategy: simple-shuffle
+  num_retries: 2
+  timeout: 60
+  fallbacks:
+    - smart-cloud: ["bulk"]
+    - vision-cheap: ["smart-cloud"]
+  context_window_fallbacks:
+    - bulk: ["smart-cloud"]
+
+litellm_settings:
+  drop_params: true
+  set_verbose: false
+  cache: true
+  cache_params:
+    type: local
+    ttl: 3600
+
+general_settings:
+  master_key: ${LITELLM_MASTER_KEY}
+  database_url: sqlite:///./litellm.db

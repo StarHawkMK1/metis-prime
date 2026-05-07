@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+  vllm:
+    image: vllm/vllm-openai:latest
+    runtime: nvidia
+    environment:
+      HUGGING_FACE_HUB_TOKEN: "${HF_TOKEN:-}"
+    command:
+      - "--model=Qwen/Qwen3-8B-Instruct-AWQ"
+      - "--quantization=awq"
+      - "--max-model-len=32768"
+      - "--served-model-name=qwen3-local"
+      - "--gpu-memory-utilization=0.9"
+    ports:
+      - "8000:8000"
+    volumes:
+      - type: bind
+        source: "${HF_CACHE_DIR:-~/.cache/huggingface}"
+        target: /root/.cache/huggingface
+    restart: unless-stopped
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    ports:
+      - "4000:4000"
+    volumes:
+      - type: bind
+        source: ../configs/litellm_config.yaml
+        target: /app/config.yaml
+    command: ["--config=/app/config.yaml", "--port=4000"]
+    environment:
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
+      LITELLM_MASTER_KEY: "${LITELLM_MASTER_KEY:-}"
+    depends_on:
+      - vllm
+    restart: unless-stopped
