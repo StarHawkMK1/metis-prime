@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 runner = CliRunner()
@@ -43,3 +44,52 @@ def test_init_is_idempotent(tmp_path: Path) -> None:
     runner.invoke(app, ["init", str(vault)])
     result = runner.invoke(app, ["init", str(vault)])
     assert result.exit_code == 0, result.output
+
+
+def test_status_vault_not_found(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from second_brain.cli import app
+
+    monkeypatch.setenv("SECOND_BRAIN_VAULT_PATH", str(tmp_path / "nonexistent"))
+    result = runner.invoke(app, ["status"])
+    assert result.exit_code == 1
+
+
+def test_status_shows_vault_info(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from second_brain.cli import app
+
+    vault = tmp_path / "vault"
+    runner.invoke(app, ["init", str(vault)])
+    monkeypatch.setenv("SECOND_BRAIN_VAULT_PATH", str(vault))
+    result = runner.invoke(app, ["status"])
+    assert result.exit_code == 0
+    assert "Wiki pages" in result.output
+    assert "Inbox items" in result.output
+
+
+def test_note_add_creates_wiki_page(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from second_brain.cli import app
+
+    vault = tmp_path / "vault"
+    runner.invoke(app, ["init", str(vault)])
+    monkeypatch.setenv("SECOND_BRAIN_VAULT_PATH", str(vault))
+
+    result = runner.invoke(
+        app,
+        ["note", "add", "wiki/concepts/python.md", "--title", "Python"],
+    )
+    assert result.exit_code == 0, result.output
+    assert (vault / "wiki" / "concepts" / "python.md").exists()
+
+
+def test_note_add_raw_path_raises(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from second_brain.cli import app
+
+    vault = tmp_path / "vault"
+    runner.invoke(app, ["init", str(vault)])
+    monkeypatch.setenv("SECOND_BRAIN_VAULT_PATH", str(vault))
+
+    result = runner.invoke(
+        app,
+        ["note", "add", "raw/inbox/bad.md", "--title", "Bad"],
+    )
+    assert result.exit_code != 0

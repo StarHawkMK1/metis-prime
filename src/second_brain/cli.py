@@ -249,3 +249,59 @@ def init(
         init_repo(vault_path)
 
     console.print(f"[green]✓[/green] Vault initialized at [bold]{vault_path}[/bold]")
+
+
+@app.command()
+def status() -> None:
+    """Show vault health: page count and inbox size."""
+    from .config import Settings
+
+    settings = Settings()
+    vault_path = settings.vault_path.expanduser().resolve()
+
+    if not vault_path.exists():
+        console.print(f"[red]✗[/red] Vault not found: [bold]{vault_path}[/bold]")
+        raise typer.Exit(1)
+
+    wiki_pages = list((vault_path / "wiki").rglob("*.md")) if (vault_path / "wiki").exists() else []
+    inbox_items = (
+        [f for f in (vault_path / "raw" / "inbox").iterdir() if f.is_file()]
+        if (vault_path / "raw" / "inbox").exists()
+        else []
+    )
+
+    console.print(f"[bold]Vault:[/bold] {vault_path}")
+    console.print(f"  Wiki pages : {len(wiki_pages)}")
+    console.print(f"  Inbox items: {len(inbox_items)}")
+
+
+@note_app.command("add")
+def note_add(
+    path: Annotated[str, typer.Argument(help="Relative path inside vault, e.g. wiki/concepts/foo.md")],
+    title: Annotated[str, typer.Option("--title", "-t", help="Page title (required)")],
+    page_type: Annotated[str, typer.Option("--type", help="Page type (default: concept)")] = "concept",
+) -> None:
+    """Create a new wiki page at the given vault-relative path."""
+    from typing import cast
+
+    from .config import Settings
+    from .storage import Vault, WikiPage
+    from .storage.frontmatter import PageType
+
+    _valid_types = ("concept", "project", "person", "place", "ref", "map")
+    if page_type not in _valid_types:
+        console.print(
+            f"[red]Invalid type[/red] '{page_type}'. Choose from: {', '.join(_valid_types)}"
+        )
+        raise typer.Exit(1)
+
+    settings = Settings()
+    vault = Vault(settings.vault_path)
+
+    try:
+        page = WikiPage(title=title, type=cast(PageType, page_type))
+        written = vault.write_page(path, page)
+        console.print(f"[green]✓[/green] Created [bold]{written}[/bold]")
+    except RuntimeError as exc:
+        console.print(f"[red]✗[/red] {exc}")
+        raise typer.Exit(1) from exc
