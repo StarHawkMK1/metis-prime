@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from datetime import datetime
 
+from pydantic import BaseModel, Field
 
-@dataclass
-class LLMCallMetrics:
+
+class LLMCallMetrics(BaseModel):
     task_type: str
     sensitivity: str
     model: str
     latency_ms: float
     prompt_tokens: int
     completion_tokens: int
-    timestamp: datetime = field(default_factory=datetime.now)
+    timestamp: datetime = Field(default_factory=datetime.now)
     error: str | None = None
 
 
