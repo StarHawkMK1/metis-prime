@@ -16,7 +16,7 @@ services:
       - "8000:8000"
     volumes:
       - type: bind
-        source: "${HF_CACHE_DIR:-~/.cache/huggingface}"
+        source: "${HF_CACHE_DIR:-${HOME}/.cache/huggingface}"
         target: /root/.cache/huggingface
     restart: unless-stopped
 
@@ -34,6 +34,7 @@ services:
       OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
       GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
       LITELLM_MASTER_KEY: "${LITELLM_MASTER_KEY:-}"
+      VLLM_API_BASE: "http://vllm:8000/v1"
     depends_on:
       - vllm
     restart: unless-stopped

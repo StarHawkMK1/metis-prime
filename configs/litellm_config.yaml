@@ -3,7 +3,7 @@ model_list:
   - model_name: local-fast
     litellm_params:
       model: openai/qwen3-local
-      api_base: http://localhost:8000/v1
+      api_base: "os.environ/VLLM_API_BASE"
       api_key: dummy
       max_tokens: 4096
 
@@ -44,5 +44,5 @@ litellm_settings:
     ttl: 3600
 
 general_settings:
-  master_key: ${LITELLM_MASTER_KEY}
+  master_key: "os.environ/LITELLM_MASTER_KEY"
   database_url: sqlite:///./litellm.db
