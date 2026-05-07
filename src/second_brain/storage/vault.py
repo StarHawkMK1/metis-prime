@@ -37,3 +37,28 @@ class Vault:
         if not base.exists():
             return []
         return sorted(base.rglob("*.md"))
+
+    def read_raw_text(self, relative_path: str) -> str:
+        """Read a raw source file as plain text. Does not guard writes."""
+        return (self.path / relative_path).read_text(encoding="utf-8")
+
+    def page_exists(self, relative_path: str) -> bool:
+        """Return True if a vault-relative page path exists on disk."""
+        return (self.path / relative_path).exists()
+
+    def archive_raw(self, relative_path: str) -> Path:
+        """Move a raw file to raw/archived/ and commit the change."""
+        src = self.path / relative_path
+        if not src.exists():
+            raise FileNotFoundError(f"Raw file not found: {src}")
+        dst_dir = self.path / "raw" / "archived"
+        dst_dir.mkdir(parents=True, exist_ok=True)
+        dst = dst_dir / src.name
+        src.rename(dst)
+        auto_commit(
+            self.path,
+            f"archive: {src.name}",
+            [dst],
+            removed_paths=[src],
+        )
+        return dst

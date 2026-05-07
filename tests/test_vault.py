@@ -161,3 +161,91 @@ def test_write_page_auto_commits(tmp_vault: Path) -> None:
     # init commit + write commit = 2
     assert len(commits) >= 2
     assert "write:" in commits[0].message
+
+
+def test_vault_read_raw_text(tmp_vault: Path) -> None:
+    source = tmp_vault / "raw" / "inbox" / "note.md"
+    source.write_text("# Hello\nContent here.", encoding="utf-8")
+    vault = Vault(tmp_vault)
+    text = vault.read_raw_text("raw/inbox/note.md")
+    assert "Content here." in text
+
+
+def test_vault_page_exists_true(tmp_vault: Path) -> None:
+    vault = Vault(tmp_vault)
+    vault.write_page("wiki/concepts/existing.md", WikiPage(title="Existing", type="concept"))
+    assert vault.page_exists("wiki/concepts/existing.md") is True
+
+
+def test_vault_page_exists_false(tmp_vault: Path) -> None:
+    vault = Vault(tmp_vault)
+    assert vault.page_exists("wiki/concepts/ghost.md") is False
+
+
+def test_vault_archive_raw_moves_file(tmp_vault: Path) -> None:
+    source = tmp_vault / "raw" / "inbox" / "clip.md"
+    source.write_text("# Clip\nsome content", encoding="utf-8")
+    # Stage the new file so git knows about it
+    import pygit2
+
+    repo = pygit2.Repository(str(tmp_vault))
+    idx = repo.index
+    idx.read()
+    idx.add("raw/inbox/clip.md")
+    idx.write()
+    sig = pygit2.Signature("Test", "test@test.com")
+    tree = idx.write_tree()
+    repo.create_commit("refs/heads/main", sig, sig, "add raw file", tree, [repo.head.target])
+
+    vault = Vault(tmp_vault)
+    archived = vault.archive_raw("raw/inbox/clip.md")
+    assert archived.exists()
+    assert "archived" in str(archived)
+    assert not source.exists()
+
+
+def test_vault_archive_raw_commits(tmp_vault: Path) -> None:
+    source = tmp_vault / "raw" / "inbox" / "note2.md"
+    source.write_text("content", encoding="utf-8")
+    import pygit2
+
+    repo = pygit2.Repository(str(tmp_vault))
+    idx = repo.index
+    idx.read()
+    idx.add("raw/inbox/note2.md")
+    idx.write()
+    sig = pygit2.Signature("Test", "test@test.com")
+    tree = idx.write_tree()
+    repo.create_commit("refs/heads/main", sig, sig, "add raw2", tree, [repo.head.target])
+
+    vault = Vault(tmp_vault)
+    vault.archive_raw("raw/inbox/note2.md")
+    repo2 = pygit2.Repository(str(tmp_vault))
+    commits = list(repo2.walk(repo2.head.target))
+    assert any("archive:" in c.message for c in commits)
+
+
+def test_auto_commit_with_removed_paths(tmp_path: Path) -> None:
+    from second_brain.storage.git_ops import auto_commit, init_repo
+
+    target = tmp_path / "repo"
+    target.mkdir()
+    init_repo(target)
+    # add a file so we can remove it
+    f = target / "file.md"
+    f.write_text("hello", encoding="utf-8")
+    auto_commit(target, "add file", [f])
+    # now rename (delete original, add at new location)
+    dst = target / "moved.md"
+    f.rename(dst)
+    auto_commit(target, "move file", [dst], removed_paths=[f])
+    import pygit2
+
+    repo = pygit2.Repository(str(target))
+    commits = list(repo.walk(repo.head.target))
+    assert commits[0].message == "move file"
+    # verify old path not in tree, new path in tree
+    tree = repo.head.peel(pygit2.Tree)
+    names = [entry.name for entry in tree]
+    assert "moved.md" in names
+    assert "file.md" not in names

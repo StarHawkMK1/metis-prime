@@ -23,9 +23,14 @@ def init_repo(path: Path) -> None:
     repo.create_commit("refs/heads/main", sig, sig, "init: initialize vault", tree, [])
 
 
-def auto_commit(repo_path: Path, message: str, paths: list[Path]) -> None:
-    """Stage specific files and create a commit. No-op if paths is empty."""
-    if not paths:
+def auto_commit(
+    repo_path: Path,
+    message: str,
+    paths: list[Path],
+    removed_paths: list[Path] | None = None,
+) -> None:
+    """Stage additions and optional removals, then commit. No-op if nothing to stage."""
+    if not paths and not removed_paths:
         return
     repo = pygit2.Repository(str(repo_path))
     index = repo.index
@@ -33,6 +38,9 @@ def auto_commit(repo_path: Path, message: str, paths: list[Path]) -> None:
     for p in paths:
         rel = str(p.relative_to(repo_path)).replace("\\", "/")
         index.add(rel)
+    for p in removed_paths or []:
+        rel = str(p.relative_to(repo_path)).replace("\\", "/")
+        index.remove(rel)
     index.write()
     sig = _get_signature(repo)
     tree = index.write_tree()
