@@ -11,6 +11,7 @@ dependencies = [
     "structlog>=24.1",
     "pygit2>=1.15",
     "openai>=1.50",
+    "rank-bm25>=0.2",
 ]
 
 [project.optional-dependencies]
@@ -52,7 +53,7 @@ python_version = "3.11"
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["frontmatter", "pygit2"]
+module = ["frontmatter", "pygit2", "rank_bm25"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
