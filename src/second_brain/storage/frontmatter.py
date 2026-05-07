@@ -4,7 +4,7 @@ from datetime import date
 from typing import Any, Literal, cast
 
 import frontmatter as fm
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 PageType = Literal["concept", "project", "person", "place", "ref", "map"]
 PageStatus = Literal["draft", "active", "archived"]
@@ -14,6 +14,13 @@ class ProvenanceBreakdown(BaseModel):
     extracted: int = Field(ge=0, le=100, default=70)
     inferred: int = Field(ge=0, le=100, default=25)
     ambiguous: int = Field(ge=0, le=100, default=5)
+
+    @model_validator(mode="after")
+    def _sum_must_be_100(self) -> ProvenanceBreakdown:
+        total = self.extracted + self.inferred + self.ambiguous
+        if total != 100:
+            raise ValueError(f"provenance fields must sum to 100, got {total}")
+        return self
 
 
 class WikiPage(BaseModel):

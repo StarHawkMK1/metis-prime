@@ -306,6 +306,6 @@ def note_add(
         page = WikiPage(title=title, type=cast(PageType, page_type))
         written = vault.write_page(path, page)
         console.print(f"[green]✓[/green] Created [bold]{written}[/bold]")
-    except RuntimeError as exc:
+    except (RuntimeError, ValueError) as exc:
         console.print(f"[red]✗[/red] {exc}")
         raise typer.Exit(1) from exc

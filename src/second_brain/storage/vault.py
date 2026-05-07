@@ -1,3 +1,4 @@
+from datetime import date
 from pathlib import Path
 
 from .frontmatter import WikiPage
@@ -21,6 +22,7 @@ class Vault:
     def write_page(self, relative_path: str, page: WikiPage) -> Path:
         full_path = self.path / relative_path
         self._guard_raw(full_path)
+        page = page.model_copy(update={"updated": date.today()})
         full_path.parent.mkdir(parents=True, exist_ok=True)
         full_path.write_text(page.to_markdown(), encoding="utf-8")
         auto_commit(self.path, f"write: {relative_path}", [full_path])
