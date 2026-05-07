@@ -6,6 +6,7 @@ import pytest
 from second_brain.config import Settings
 from second_brain.storage.frontmatter import ProvenanceBreakdown, WikiPage
 from second_brain.storage.git_ops import auto_commit, init_repo
+from second_brain.storage.vault import Vault
 
 
 def test_settings_defaults() -> None:
@@ -114,3 +115,49 @@ def test_auto_commit_noop_on_empty_paths(tmp_path: Path) -> None:
     repo = pygit2.Repository(str(target))
     commits = list(repo.walk(repo.head.target))
     assert len(commits) == 1
+
+
+def test_write_page_creates_file(tmp_vault: Path) -> None:
+    vault = Vault(tmp_vault)
+    page = WikiPage(title="Test Concept", type="concept")
+    path = vault.write_page("wiki/concepts/test.md", page)
+    assert path.exists()
+
+
+def test_write_page_roundtrip_via_read(tmp_vault: Path) -> None:
+    vault = Vault(tmp_vault)
+    page = WikiPage(title="Hello World", type="concept", body="Content here.")
+    vault.write_page("wiki/concepts/hello.md", page)
+    loaded = vault.read_page("wiki/concepts/hello.md")
+    assert loaded.title == "Hello World"
+    assert loaded.body == "Content here."
+
+
+def test_list_pages_returns_md_files(tmp_vault: Path) -> None:
+    vault = Vault(tmp_vault)
+    vault.write_page("wiki/concepts/a.md", WikiPage(title="A", type="concept"))
+    vault.write_page("wiki/concepts/b.md", WikiPage(title="B", type="ref"))
+    pages = vault.list_pages()
+    assert len(pages) == 2
+
+
+def test_list_pages_empty_returns_empty_list(tmp_vault: Path) -> None:
+    vault = Vault(tmp_vault)
+    assert vault.list_pages() == []
+
+
+def test_write_to_raw_raises_runtime_error(tmp_vault: Path) -> None:
+    vault = Vault(tmp_vault)
+    page = WikiPage(title="Forbidden", type="concept")
+    with pytest.raises(RuntimeError, match="Cannot write to raw/"):
+        vault.write_page("raw/inbox/forbidden.md", page)
+
+
+def test_write_page_auto_commits(tmp_vault: Path) -> None:
+    vault = Vault(tmp_vault)
+    vault.write_page("wiki/concepts/test.md", WikiPage(title="T", type="concept"))
+    repo = pygit2.Repository(str(tmp_vault))
+    commits = list(repo.walk(repo.head.target))
+    # init commit + write commit = 2
+    assert len(commits) >= 2
+    assert "write:" in commits[0].message
