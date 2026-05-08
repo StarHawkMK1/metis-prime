@@ -1,0 +1,6 @@
+# .graphifyignore — placed at vault root when scope=all
+raw/archived/
+_meta/
+graph/
+.git/
+.obsidian/
