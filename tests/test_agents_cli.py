@@ -86,3 +86,58 @@ def test_lint_cli_clean_vault(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
         result = runner.invoke(app, ["lint"])
     assert result.exit_code == 0
     assert "0" in result.output or "no issues" in result.output.lower()
+
+
+def test_graph_build_command(mocker, tmp_path):
+    from typer.testing import CliRunner
+
+    from second_brain.cli import app
+
+    mock_builder = mocker.MagicMock()
+    mock_builder.build.return_value = tmp_path / "graph" / "graphify-out" / "graph.json"
+    mocker.patch("second_brain.graph.builder.GraphBuilder", return_value=mock_builder)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["graph", "build", "--vault", str(tmp_path)],
+    )
+    assert result.exit_code == 0, result.output
+    assert "graph.json" in result.output
+
+
+def test_graph_build_update_flag(mocker, tmp_path):
+    from typer.testing import CliRunner
+
+    from second_brain.cli import app
+
+    mock_builder = mocker.MagicMock()
+    mock_builder.update.return_value = tmp_path / "graph" / "graphify-out" / "graph.json"
+    mocker.patch("second_brain.graph.builder.GraphBuilder", return_value=mock_builder)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["graph", "build", "--vault", str(tmp_path), "--update"],
+    )
+    assert result.exit_code == 0, result.output
+    mock_builder.update.assert_called_once()
+
+
+def test_graph_query_command(mocker, tmp_path):
+    from typer.testing import CliRunner
+
+    from second_brain.agents.query import QueryResult
+    from second_brain.cli import app
+
+    mock_agent = mocker.MagicMock()
+    mock_agent.ask.return_value = QueryResult(answer="Graph answer.", sources=["wiki/ml.md"])
+    mocker.patch("second_brain.agents.query.QueryAgent", return_value=mock_agent)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["graph", "query", "What is ML?", "--vault", str(tmp_path)],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Graph answer." in result.output

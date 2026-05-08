@@ -17,6 +17,8 @@ note_app = typer.Typer(help="Note management commands.")
 llm_app = typer.Typer(help="LLM router commands.")
 app.add_typer(note_app, name="note")
 app.add_typer(llm_app, name="llm")
+graph_app = typer.Typer(help="Knowledge graph commands.")
+app.add_typer(graph_app, name="graph")
 
 console = Console()
 
@@ -452,6 +454,52 @@ def query(
     console.print(result.answer)
     if result.sources:
         console.print("\n[dim]Sources: " + ", ".join(result.sources) + "[/dim]")
+
+
+# ── Graph commands ────────────────────────────────────────────────────────────
+
+
+@graph_app.command("build")
+def graph_build(
+    vault: Annotated[str, typer.Option(envvar="SECOND_BRAIN_VAULT_PATH", help="Vault root path")],
+    update: bool = typer.Option(False, "--update", help="Incremental update only"),
+    scope: str = typer.Option("wiki", "--scope", help="Scan scope: wiki | raw | all"),
+) -> None:
+    """Build (or incrementally update) the knowledge graph."""
+    from .graph.builder import GraphBuilder
+
+    builder = GraphBuilder(Path(vault))
+    if update:
+        path = builder.update(scope=scope)
+        console.print(f"[green]Graph updated:[/green] {path}")
+    else:
+        path = builder.build(scope=scope)
+        report = Path(vault) / "GRAPH_REPORT.md"
+        console.print(f"[green]Graph built:[/green] {path}")
+        if report.exists():
+            console.print(f"[green]Report:[/green] {report}")
+
+
+@graph_app.command("query")
+def graph_query_cmd(
+    question: Annotated[str, typer.Argument(help="Natural language question")],
+    vault: Annotated[str, typer.Option(envvar="SECOND_BRAIN_VAULT_PATH", help="Vault root path")],
+    depth: int = typer.Option(2, "--depth", "-d", help="Graph traversal depth"),
+    sensitivity: str = typer.Option("normal", "--sensitivity", "-s", help="normal | private"),
+) -> None:
+    """Answer a question using graph-augmented wiki context."""
+    from .agents.query import QueryAgent
+    from .storage.vault import Vault as _Vault
+
+    agent = QueryAgent(
+        _Vault(Path(vault)),
+        sensitivity=sensitivity,  # type: ignore[arg-type]
+        graph_depth=depth,
+    )
+    result = agent.ask(question)
+    console.print(result.answer)
+    if result.sources:
+        console.print(f"\n[dim]Sources: {', '.join(result.sources)}[/dim]")
 
 
 @app.command()
