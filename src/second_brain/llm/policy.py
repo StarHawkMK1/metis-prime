@@ -11,6 +11,8 @@ _POLICY: dict[str, str] = {
     "vision": "vision-cheap",
     "lint_check": "bulk",
     "graph_traversal": "bulk",
+    "task_extract": "bulk",
+    "lint_contradiction": "bulk",
 }
 
 
