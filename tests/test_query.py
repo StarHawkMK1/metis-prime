@@ -79,3 +79,84 @@ def test_query_uses_synthesis_complex_task_type(wiki_vault: Vault) -> None:
     agent.ask("anything")
     call_kwargs = mock_router.complete.call_args[1]
     assert call_kwargs["task_type"] == "synthesis_complex"
+
+
+def test_query_uses_graph_when_nodes_found(mocker, tmp_path):
+    from second_brain.agents.query import QueryAgent
+    from second_brain.graph.query import GraphContext, GraphNode, GraphQuery
+    from second_brain.llm.router import LLMRouter
+    from second_brain.storage.vault import Vault
+
+    vault = Vault(tmp_path)
+    (tmp_path / "wiki").mkdir()
+    (tmp_path / "wiki" / "ml.md").write_text(
+        "---\ntitle: ML\nupdated: 2026-01-01\n---\n# Machine Learning content",
+        encoding="utf-8",
+    )
+
+    mock_router = mocker.Mock(spec=LLMRouter)
+    mock_router.complete.return_value = "Graph-based answer."
+
+    mock_gq = mocker.Mock(spec=GraphQuery)
+    mock_gq.search_and_expand.return_value = GraphContext(
+        nodes=[GraphNode(id="n1", label="ML", source_file="wiki/ml.md")],
+        edges=[],
+    )
+    mocker.patch("second_brain.agents.query.GraphQuery", return_value=mock_gq)
+
+    agent = QueryAgent(vault, router=mock_router)
+    result = agent.ask("What is machine learning?")
+
+    assert result.answer == "Graph-based answer."
+    mock_gq.search_and_expand.assert_called_once_with("What is machine learning?", depth=2)
+
+
+def test_query_falls_back_to_bm25_when_graph_empty(mocker, tmp_path):
+    from second_brain.agents.query import QueryAgent
+    from second_brain.agents.search import WikiSearcher
+    from second_brain.graph.query import GraphContext, GraphQuery
+    from second_brain.llm.router import LLMRouter
+    from second_brain.storage.vault import Vault
+
+    vault = Vault(tmp_path)
+    (tmp_path / "wiki").mkdir()
+
+    mock_router = mocker.Mock(spec=LLMRouter)
+    mock_router.complete.return_value = "BM25 answer."
+
+    mock_gq = mocker.Mock(spec=GraphQuery)
+    mock_gq.search_and_expand.return_value = GraphContext()  # empty — no match
+    mocker.patch("second_brain.agents.query.GraphQuery", return_value=mock_gq)
+
+    mock_ws = mocker.Mock(spec=WikiSearcher)
+    mock_ws.search.return_value = []
+    mocker.patch("second_brain.agents.query.WikiSearcher", return_value=mock_ws)
+
+    agent = QueryAgent(vault, router=mock_router)
+    result = agent.ask("What is X?")
+
+    mock_ws.search.assert_called_once()
+    assert result.answer == "BM25 answer."
+
+
+def test_query_graph_depth_parameter_respected(mocker, tmp_path):
+    from second_brain.agents.query import QueryAgent
+    from second_brain.graph.query import GraphContext, GraphQuery
+    from second_brain.llm.router import LLMRouter
+    from second_brain.storage.vault import Vault
+
+    vault = Vault(tmp_path)
+    (tmp_path / "wiki").mkdir()
+
+    mock_router = mocker.Mock(spec=LLMRouter)
+    mock_router.complete.return_value = "Answer."
+
+    mock_gq = mocker.Mock(spec=GraphQuery)
+    mock_gq.search_and_expand.return_value = GraphContext()
+    mocker.patch("second_brain.agents.query.GraphQuery", return_value=mock_gq)
+    mocker.patch("second_brain.agents.query.WikiSearcher")
+
+    agent = QueryAgent(vault, router=mock_router, graph_depth=3)
+    agent.ask("question")
+
+    mock_gq.search_and_expand.assert_called_once_with("question", depth=3)
