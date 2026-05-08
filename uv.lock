@@ -2727,6 +2727,12 @@ proxy = [
     { name = "litellm", extra = ["proxy"] },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pre-commit" },
+    { name = "pytest" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "litellm", extras = ["proxy"], marker = "extra == 'proxy'", specifier = ">=1.50" },
@@ -2747,6 +2753,12 @@ requires-dist = [
     { name = "typer", specifier = ">=0.12" },
 ]
 provides-extras = ["proxy", "dev"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pre-commit", specifier = ">=4.6.0" },
+    { name = "pytest", specifier = ">=9.0.3" },
+]
 
 [[package]]
 name = "shellingham"
