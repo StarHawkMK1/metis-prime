@@ -10,6 +10,7 @@ _POLICY: dict[str, str] = {
     "synthesis_complex": "smart-cloud",
     "vision": "vision-cheap",
     "lint_check": "bulk",
+    "graph_traversal": "bulk",
 }
 
 

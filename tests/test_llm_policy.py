@@ -64,3 +64,17 @@ def test_private_sensitivity_always_selects_local_model(task_type: str, sensitiv
         assert model in LOCAL_MODELS, (
             f"PRIVACY VIOLATION: {task_type!r} + private → {model!r} (not in LOCAL_MODELS)"
         )
+
+
+def test_graph_traversal_policy_entry() -> None:
+    from second_brain.llm.policy import select_model
+
+    model = select_model("graph_traversal", "normal")
+    assert model == "bulk"
+
+
+def test_graph_traversal_private_routes_local() -> None:
+    from second_brain.llm.policy import select_model
+
+    model = select_model("graph_traversal", "private")
+    assert model == "local-fast"
