@@ -469,15 +469,19 @@ def graph_build(
     from .graph.builder import GraphBuilder
 
     builder = GraphBuilder(Path(vault))
-    if update:
-        path = builder.update(scope=scope)
-        console.print(f"[green]Graph updated:[/green] {path}")
-    else:
-        path = builder.build(scope=scope)
-        report = Path(vault) / "GRAPH_REPORT.md"
-        console.print(f"[green]Graph built:[/green] {path}")
-        if report.exists():
-            console.print(f"[green]Report:[/green] {report}")
+    try:
+        if update:
+            path = builder.update(scope=scope)
+            console.print(f"[green]Graph updated:[/green] {path}")
+        else:
+            path = builder.build(scope=scope)
+            report = Path(vault) / "GRAPH_REPORT.md"
+            console.print(f"[green]Graph built:[/green] {path}")
+            if report.exists():
+                console.print(f"[green]Report:[/green] {report}")
+    except RuntimeError as exc:
+        console.print(f"[red]Graph build failed:[/red] {exc}")
+        raise typer.Exit(1) from exc
 
 
 @graph_app.command("query")
