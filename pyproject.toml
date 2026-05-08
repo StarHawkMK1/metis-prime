@@ -13,6 +13,8 @@ dependencies = [
     "openai>=1.50",
     "rank-bm25>=0.2",
     "graphifyy[mcp]>=0.7.10",
+    "langgraph>=0.2",
+    "langchain-core>=0.3",
 ]
 
 [project.optional-dependencies]
