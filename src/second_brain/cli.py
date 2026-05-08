@@ -6,6 +6,9 @@ from typing import Annotated
 import typer
 from rich.console import Console
 
+from .agents.ingest import IngestAgent, IngestError
+from .agents.lint import LintAgent
+from .agents.query import QueryAgent
 from .llm import LLMRouter
 from .storage.git_ops import init_repo
 
@@ -383,3 +386,91 @@ def llm_test() -> None:
     except Exception as exc:
         console.print(f"[red]✗[/red] Unexpected error: {exc}")
         raise typer.Exit(1) from exc
+
+
+@app.command()
+def ingest(
+    path: Annotated[str | None, typer.Argument(help="Vault-relative path to source file")] = None,
+    inbox: Annotated[bool, typer.Option("--inbox", help="Process all files in raw/inbox/")] = False,
+    sensitivity: Annotated[
+        str, typer.Option("--sensitivity", "-s", help="normal|private")
+    ] = "normal",
+) -> None:
+    """Ingest a raw source file (or the full inbox) into the wiki."""
+    from .config import Settings
+    from .storage import Vault
+
+    if not path and not inbox:
+        console.print("[red]✗[/red] Provide a file path or --inbox")
+        raise typer.Exit(1)
+
+    settings = Settings()
+    vault = Vault(settings.vault_path)
+    router = LLMRouter(settings=settings)
+    agent = IngestAgent(vault=vault, router=router)
+
+    def _do_ingest(rel: str) -> None:
+        try:
+            result = agent.run(rel, sensitivity=sensitivity)  # type: ignore[arg-type]
+            console.print(
+                f"[green]✓[/green] {result.decision}: [bold]{result.source_name}[/bold]"
+                + (f" → {result.wiki_path}" if result.wiki_path else "")
+            )
+        except IngestError as exc:
+            console.print(f"[red]✗[/red] {exc}")
+
+    if inbox:
+        inbox_dir = settings.vault_path.expanduser().resolve() / "raw" / "inbox"
+        files = [f for f in inbox_dir.iterdir() if f.is_file()] if inbox_dir.exists() else []
+        if not files:
+            console.print("[yellow]Inbox is empty[/yellow]")
+            return
+        for f in files:
+            rel = str(f.relative_to(settings.vault_path.expanduser().resolve())).replace("\\", "/")
+            _do_ingest(rel)
+    else:
+        _do_ingest(path)  # type: ignore[arg-type]
+
+
+@app.command()
+def query(
+    question: Annotated[str, typer.Argument(help="Natural language question")],
+    sensitivity: Annotated[
+        str, typer.Option("--sensitivity", "-s", help="normal|private")
+    ] = "normal",
+) -> None:
+    """Ask a question; answer is synthesized from the wiki."""
+    from .config import Settings
+    from .storage import Vault
+
+    settings = Settings()
+    vault = Vault(settings.vault_path)
+    router = LLMRouter(settings=settings)
+    agent = QueryAgent(vault=vault, router=router)
+
+    result = agent.ask(question, sensitivity=sensitivity)  # type: ignore[arg-type]
+    console.print(result.answer)
+    if result.sources:
+        console.print("\n[dim]Sources: " + ", ".join(result.sources) + "[/dim]")
+
+
+@app.command()
+def lint() -> None:
+    """Scan the wiki for broken links, orphans, stale drafts, and provenance drift."""
+    from .config import Settings
+    from .storage import Vault
+
+    settings = Settings()
+    vault = Vault(settings.vault_path)
+    agent = LintAgent(vault)
+    report = agent.run()
+
+    issue_count = len(report.issues)
+    if issue_count == 0:
+        console.print("[green]✓[/green] No issues found. Vault is healthy.")
+    else:
+        console.print(f"[yellow]⚠[/yellow] {issue_count} issue(s) found:")
+        for issue in report.issues[:20]:
+            console.print(f"  [{issue.kind}] {issue.page} — {issue.detail}")
+        if issue_count > 20:
+            console.print(f"  ... and {issue_count - 20} more. See journal/ for full report.")
