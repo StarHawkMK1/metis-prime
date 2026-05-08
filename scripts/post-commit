@@ -1,0 +1,25 @@
+#!/bin/sh
+# Incrementally update the knowledge graph after each vault commit.
+# Installed to .git/hooks/post-commit by: python scripts/install_hooks.py
+
+VAULT="${SECOND_BRAIN_VAULT_PATH:-}"
+
+if [ -z "$VAULT" ]; then
+    echo "[second-brain] SECOND_BRAIN_VAULT_PATH not set -- skipping graph update"
+    exit 0
+fi
+
+if ! command -v second-brain > /dev/null 2>&1; then
+    echo "[second-brain] CLI not found -- skipping graph update"
+    exit 0
+fi
+
+GRAPH_JSON="$VAULT/graph/graphify-out/graph.json"
+if [ ! -f "$GRAPH_JSON" ]; then
+    echo "[second-brain] No graph.json found -- run 'second-brain graph build' first"
+    exit 0
+fi
+
+echo "[second-brain] Updating knowledge graph (incremental)..."
+second-brain graph build --update --vault "$VAULT" 2>&1 || \
+    echo "[second-brain] Graph update failed (non-fatal -- commit succeeded)"
