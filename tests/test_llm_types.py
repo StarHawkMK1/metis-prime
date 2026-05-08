@@ -11,6 +11,8 @@ def test_task_type_literals() -> None:
         "vision",
         "lint_check",
         "graph_traversal",
+        "task_extract",
+        "lint_contradiction",
     }
 
 
@@ -36,3 +38,13 @@ def test_graph_traversal_is_valid_task_type() -> None:
 
     args = typing.get_args(TaskType)
     assert "graph_traversal" in args
+
+
+def test_task_type_includes_phase5_types() -> None:
+    from typing import get_args
+
+    from second_brain.llm.types import TaskType
+
+    args = get_args(TaskType)
+    assert "task_extract" in args
+    assert "lint_contradiction" in args
