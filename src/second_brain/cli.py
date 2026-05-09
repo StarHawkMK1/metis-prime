@@ -21,6 +21,8 @@ graph_app = typer.Typer(help="Knowledge graph commands.")
 app.add_typer(graph_app, name="graph")
 review_app = typer.Typer(help="Human-in-the-loop review queue commands.")
 app.add_typer(review_app, name="review")
+cost_app = typer.Typer(help="LLM cost tracking commands.")
+app.add_typer(cost_app, name="cost")
 
 console = Console()
 
@@ -544,3 +546,26 @@ def review_process() -> None:
     vault = Vault(settings.vault_path)
     result = process_review(vault)
     typer.echo(f"Processed: {result.accepted} accepted, {result.rejected} rejected.")
+
+
+# ── Cost commands ──────────────────────────────────────────────────────────────
+
+
+@cost_app.command("report")
+def cost_report() -> None:
+    """Write the monthly LLM cost report to journal/cost-YYYY-MM.md."""
+    from datetime import date
+
+    from .agents.graphs.cost_reporter import CostReporter
+    from .config import Settings
+    from .llm.metrics import MetricsRecorder
+    from .storage.vault import Vault
+
+    settings = Settings()
+    vault = Vault(settings.vault_path)
+    month_str = date.today().strftime("%Y-%m")
+    log_path = vault.path / "journal" / ".metrics" / f"{month_str}.jsonl"
+    recorder = MetricsRecorder.from_jsonl(log_path)
+    reporter = CostReporter(vault=vault, recorder=recorder)
+    path = reporter.write_monthly_report()
+    typer.echo(f"Cost report written to: {path}")
