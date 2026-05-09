@@ -19,6 +19,8 @@ app.add_typer(note_app, name="note")
 app.add_typer(llm_app, name="llm")
 graph_app = typer.Typer(help="Knowledge graph commands.")
 app.add_typer(graph_app, name="graph")
+review_app = typer.Typer(help="Human-in-the-loop review queue commands.")
+app.add_typer(review_app, name="review")
 
 console = Console()
 
@@ -526,3 +528,19 @@ def lint() -> None:
             console.print(f"  [{issue.kind}] {issue.page} — {issue.detail}")
         if issue_count > 20:
             console.print(f"  ... and {issue_count - 20} more. See journal/ for full report.")
+
+
+# ── Review commands ────────────────────────────────────────────────────────────
+
+
+@review_app.command("process")
+def review_process() -> None:
+    """Process human_review/accepted/ and human_review/rejected/ queues."""
+    from .agents.graphs.human_review import process_review
+    from .config import Settings
+    from .storage.vault import Vault
+
+    settings = Settings()
+    vault = Vault(settings.vault_path)
+    result = process_review(vault)
+    typer.echo(f"Processed: {result.accepted} accepted, {result.rejected} rejected.")
