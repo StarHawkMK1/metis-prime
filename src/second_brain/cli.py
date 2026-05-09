@@ -6,9 +6,6 @@ from typing import Annotated
 import typer
 from rich.console import Console
 
-from .agents.ingest import IngestAgent, IngestError
-from .agents.lint import LintAgent
-from .agents.query import QueryAgent
 from .llm import LLMRouter
 from .storage.git_ops import init_repo
 
@@ -19,6 +16,12 @@ app.add_typer(note_app, name="note")
 app.add_typer(llm_app, name="llm")
 graph_app = typer.Typer(help="Knowledge graph commands.")
 app.add_typer(graph_app, name="graph")
+task_app = typer.Typer(help="Task extraction commands.")
+app.add_typer(task_app, name="task")
+review_app = typer.Typer(help="Human-in-the-loop review queue commands.")
+app.add_typer(review_app, name="review")
+cost_app = typer.Typer(help="LLM cost tracking commands.")
+app.add_typer(cost_app, name="cost")
 
 console = Console()
 
@@ -398,7 +401,8 @@ def ingest(
         str, typer.Option("--sensitivity", "-s", help="normal|private")
     ] = "normal",
 ) -> None:
-    """Ingest a raw source file (or the full inbox) into the wiki."""
+    """Ingest a raw source file (or the full inbox) into the wiki using the LangGraph pipeline."""
+    from .agents.graphs.ingest_graph import IngestGraph
     from .config import Settings
     from .storage import Vault
 
@@ -408,18 +412,14 @@ def ingest(
 
     settings = Settings()
     vault = Vault(settings.vault_path)
-    router = LLMRouter(settings=settings)
-    agent = IngestAgent(vault=vault, router=router)
+    graph = IngestGraph(vault=vault, sensitivity=sensitivity)  # type: ignore[arg-type]
 
     def _do_ingest(rel: str) -> None:
-        try:
-            result = agent.run(rel, sensitivity=sensitivity)  # type: ignore[arg-type]
-            console.print(
-                f"[green]✓[/green] {result.decision}: [bold]{result.source_name}[/bold]"
-                + (f" → {result.wiki_path}" if result.wiki_path else "")
-            )
-        except IngestError as exc:
-            console.print(f"[red]✗[/red] {exc}")
+        result = graph.run(rel)
+        console.print(
+            f"[green]✓[/green] {result.decision}: [bold]{result.source_name}[/bold]"
+            + (f" → {result.wiki_path}" if result.wiki_path else "")
+        )
 
     if inbox:
         inbox_dir = settings.vault_path.expanduser().resolve() / "raw" / "inbox"
@@ -440,17 +440,19 @@ def query(
     sensitivity: Annotated[
         str, typer.Option("--sensitivity", "-s", help="normal|private")
     ] = "normal",
+    archive: Annotated[
+        bool, typer.Option("--archive", help="Save answer as a new wiki page.")
+    ] = False,
 ) -> None:
     """Ask a question; answer is synthesized from the wiki."""
+    from .agents.graphs.query_graph import QueryGraph
     from .config import Settings
     from .storage import Vault
 
     settings = Settings()
     vault = Vault(settings.vault_path)
-    router = LLMRouter(settings=settings)
-    agent = QueryAgent(vault=vault, router=router)
-
-    result = agent.ask(question, sensitivity=sensitivity)  # type: ignore[arg-type]
+    graph = QueryGraph(vault=vault, sensitivity=sensitivity)  # type: ignore[arg-type]
+    result = graph.ask(question, archive=archive)
     console.print(result.answer)
     if result.sources:
         console.print("\n[dim]Sources: " + ", ".join(result.sources) + "[/dim]")
@@ -509,20 +511,88 @@ def graph_query_cmd(
 @app.command()
 def lint() -> None:
     """Scan the wiki for broken links, orphans, stale drafts, and provenance drift."""
+    from collections import Counter
+
+    from .agents.graphs.lint_graph import LintGraph
     from .config import Settings
     from .storage import Vault
 
     settings = Settings()
     vault = Vault(settings.vault_path)
-    agent = LintAgent(vault)
-    report = agent.run()
+    graph = LintGraph(vault=vault)
+    report = graph.run()
 
     issue_count = len(report.issues)
     if issue_count == 0:
         console.print("[green]✓[/green] No issues found. Vault is healthy.")
     else:
         console.print(f"[yellow]⚠[/yellow] {issue_count} issue(s) found:")
-        for issue in report.issues[:20]:
-            console.print(f"  [{issue.kind}] {issue.page} — {issue.detail}")
+        counts = Counter(i.kind for i in report.issues)
+        for kind, count in sorted(counts.items()):
+            console.print(f"  {kind}: {count}")
         if issue_count > 20:
-            console.print(f"  ... and {issue_count - 20} more. See journal/ for full report.")
+            console.print("  See journal/ for full report.")
+
+
+# ── Task commands ──────────────────────────────────────────────────────────────
+
+
+@task_app.command("extract")
+def task_extract(
+    source: Annotated[str, typer.Argument(help="Text to extract tasks from, or path to a file.")],
+    sensitivity: Annotated[
+        str, typer.Option("--sensitivity", "-s", help="normal|private")
+    ] = "normal",
+) -> None:
+    """Extract actionable tasks from text or a file."""
+    from .agents.graphs.task_graph import TaskGraph
+    from .config import Settings
+    from .storage.vault import Vault
+
+    settings = Settings()
+    vault = Vault(settings.vault_path)
+    source_path = Path(source)
+    text = source_path.read_text(encoding="utf-8") if source_path.exists() else source
+
+    graph = TaskGraph(vault=vault)
+    result = graph.run(text, sensitivity=sensitivity)  # type: ignore[arg-type]
+    typer.echo(f"Extracted {result.new_tasks_count} new tasks → {result.tasks_file_path}")
+
+
+# ── Review commands ────────────────────────────────────────────────────────────
+
+
+@review_app.command("process")
+def review_process() -> None:
+    """Process human_review/accepted/ and human_review/rejected/ queues."""
+    from .agents.graphs.human_review import process_review
+    from .config import Settings
+    from .storage.vault import Vault
+
+    settings = Settings()
+    vault = Vault(settings.vault_path)
+    result = process_review(vault)
+    typer.echo(f"Processed: {result.accepted} accepted, {result.rejected} rejected.")
+
+
+# ── Cost commands ──────────────────────────────────────────────────────────────
+
+
+@cost_app.command("report")
+def cost_report() -> None:
+    """Write the monthly LLM cost report to journal/cost-YYYY-MM.md."""
+    from datetime import date
+
+    from .agents.graphs.cost_reporter import CostReporter
+    from .config import Settings
+    from .llm.metrics import MetricsRecorder
+    from .storage.vault import Vault
+
+    settings = Settings()
+    vault = Vault(settings.vault_path)
+    month_str = date.today().strftime("%Y-%m")
+    log_path = vault.path / "journal" / ".metrics" / f"{month_str}.jsonl"
+    recorder = MetricsRecorder.from_jsonl(log_path)
+    reporter = CostReporter(vault=vault, recorder=recorder)
+    path = reporter.write_monthly_report()
+    typer.echo(f"Cost report written to: {path}")
