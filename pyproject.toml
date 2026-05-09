@@ -13,6 +13,8 @@ dependencies = [
     "openai>=1.50",
     "rank-bm25>=0.2",
     "graphifyy[mcp]>=0.7.10",
+    "langgraph>=0.2",
+    "langchain-core>=0.3",
 ]
 
 [project.optional-dependencies]
@@ -54,7 +56,7 @@ python_version = "3.11"
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["frontmatter", "pygit2", "rank_bm25"]
+module = ["frontmatter", "pygit2", "rank_bm25", "langgraph", "langgraph.*", "langchain_core", "langchain_core.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
