@@ -77,3 +77,18 @@ def test_query_graph_no_context_still_answers(tmp_vault: Path) -> None:
     result = graph.ask("What is the capital of France?")
 
     assert len(result.answer) > 0
+
+
+def test_query_graph_task_command_falls_back_to_factual(tmp_vault: Path) -> None:
+    from second_brain.agents.graphs.query_graph import QueryGraph
+
+    vault = Vault(tmp_vault)
+    mock_router = MagicMock()
+    mock_router.complete.side_effect = ['{"intent": "task_command"}', "Fallback answer."]
+    mock_router.get_last_cost.return_value = 0.0
+
+    graph = QueryGraph(vault=vault, router=mock_router)
+    result = graph.ask("Extract tasks from today's notes")
+
+    assert len(result.answer) > 0
+    assert mock_router.complete.call_count == 2  # classify + answer

@@ -124,7 +124,8 @@ class QueryGraph:
         """Graph-first retrieval, BM25 fallback."""
         try:
             graph_ctx = self._graph_query.search_and_expand(state["question"], depth=2)
-        except Exception:
+        except Exception as exc:
+            log.debug("query_graph.graph_lookup_failed", error=str(exc))
             graph_ctx = None
 
         if graph_ctx and graph_ctx.nodes:
