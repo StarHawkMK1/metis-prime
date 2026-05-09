@@ -11,6 +11,7 @@ from ..config import Settings
 from .errors import RouterError
 from .metrics import LLMCallMetrics, MetricsRecorder
 from .policy import LOCAL_MODELS, assert_local_or_raise, select_model
+from .pricing import compute_cost
 from .types import Sensitivity, TaskType
 
 log = structlog.get_logger(__name__)
@@ -99,6 +100,7 @@ class LLMRouter:
                     latency_ms=latency_ms,
                     prompt_tokens=prompt_tokens,
                     completion_tokens=completion_tokens,
+                    cost_usd=compute_cost(model, prompt_tokens, completion_tokens),
                     error=error,
                 )
             )
@@ -112,3 +114,8 @@ class LLMRouter:
                 completion_tokens=completion_tokens,
                 error=error,
             )
+
+    def get_last_cost(self) -> float:
+        """Return the cost_usd of the most recent LLM call, or 0.0 if none."""
+        records = self._recorder.all()
+        return records[-1].cost_usd if records else 0.0
