@@ -11,6 +11,8 @@ def test_task_type_literals() -> None:
         "vision",
         "lint_check",
         "graph_traversal",
+        "task_extract",
+        "lint_contradiction",
     }
 
 
