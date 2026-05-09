@@ -11,6 +11,11 @@ PRICING: dict[str, tuple[float, float]] = {
     # Local models — zero marginal cost
     "qwen3:30b-a3b": (0.0, 0.0),
     "qwen3:8b": (0.0, 0.0),
+    # Policy aliases (what select_model() returns)
+    "bulk": (0.80, 4.00),  # claude-haiku-4-5 rates
+    "smart-cloud": (3.00, 15.00),  # claude-sonnet-4-5 rates
+    "vision-cheap": (0.80, 4.00),  # claude-haiku-4-5 rates
+    "local-fast": (0.0, 0.0),  # local model, zero cost
 }
 
 

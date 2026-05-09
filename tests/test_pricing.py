@@ -77,3 +77,34 @@ def test_metrics_recorder_persists_to_jsonl(tmp_path: Path) -> None:
     loaded = MetricsRecorder.from_jsonl(log_path)
     assert len(loaded.all()) == 1
     assert loaded.all()[0].cost_usd == pytest.approx(0.0001)
+
+
+def test_router_get_last_cost_returns_nonzero_after_call() -> None:
+    from unittest.mock import MagicMock, patch
+
+    from second_brain.config import Settings
+    from second_brain.llm.router import LLMRouter
+
+    settings = MagicMock(spec=Settings)
+    settings.litellm_base_url = "http://localhost:4000"
+    settings.litellm_master_key = None
+    settings.local_only = False
+
+    mock_response = MagicMock()
+    mock_response.choices[0].message.content = "test answer"
+    mock_response.usage.prompt_tokens = 1_000_000
+    mock_response.usage.completion_tokens = 1_000_000
+
+    with patch("second_brain.llm.router.OpenAI") as mock_openai_cls:
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = mock_response
+        mock_openai_cls.return_value = mock_client
+        router = LLMRouter(settings=settings)
+
+    router.complete(
+        [{"role": "user", "content": "hello"}],
+        task_type="ingest_summary",
+        sensitivity="normal",
+    )
+    cost = router.get_last_cost()
+    assert cost > 0.0, f"Expected non-zero cost, got {cost}"
