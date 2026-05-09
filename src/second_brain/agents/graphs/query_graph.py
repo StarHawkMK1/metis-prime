@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +10,7 @@ import structlog
 from langgraph.graph import END, START, StateGraph
 
 from ...graph.query import GraphQuery
+from ...llm.metrics import MetricsRecorder
 from ...llm.router import LLMRouter
 from ...llm.types import Sensitivity
 from ...storage.vault import Vault
@@ -35,6 +37,13 @@ If no wiki pages are relevant, say so clearly.
 """
 
 
+def _make_router(vault_path: Path) -> LLMRouter:
+    month_str = date.today().strftime("%Y-%m")
+    log_path = vault_path / "journal" / ".metrics" / f"{month_str}.jsonl"
+    recorder = MetricsRecorder(log_path=log_path)
+    return LLMRouter(metrics_recorder=recorder)
+
+
 @dataclass
 class QueryResult:
     answer: str
@@ -52,7 +61,7 @@ class QueryGraph:
         graph_depth: int = 2,
     ) -> None:
         self._vault = vault
-        self._router = router or LLMRouter()
+        self._router = router or _make_router(vault.path)
         self._top_k = top_k
         self._sensitivity = sensitivity
         self._searcher = WikiSearcher(vault)
@@ -187,14 +196,16 @@ class QueryGraph:
         }
 
     def _record(self, state: QueryState) -> dict[str, object]:
-        """Append Q&A to journal/queries.md."""
+        """Append Q&A to journal/queries.md when archive=True."""
+        if not state.get("archive"):
+            return {}
         journal_dir = self._vault.path / "journal"
         journal_dir.mkdir(parents=True, exist_ok=True)
         queries_file = journal_dir / "queries.md"
-        from datetime import date
+        from datetime import date as _date
 
         entry = (
-            f"\n## {date.today()} — {state['question'][:80]}\n\n"
+            f"\n## {_date.today()} — {state['question'][:80]}\n\n"
             f"{state['answer']}\n\n"
             f"*Sources: {', '.join(f'[[{s}]]' for s in state['sources']) or 'none'}*\n"
         )

@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import date
+from pathlib import Path
 from typing import Any
 
 import structlog
 from langgraph.graph import END, START, StateGraph
 
+from ...llm.metrics import MetricsRecorder
 from ...llm.router import LLMRouter
 from ...llm.types import Sensitivity
 from ...storage.vault import Vault
@@ -31,6 +34,13 @@ Respond with ONLY JSON: {"tasks": ["- [ ] task with #priority"]}
 """
 
 
+def _make_router(vault_path: Path) -> LLMRouter:
+    month_str = date.today().strftime("%Y-%m")
+    log_path = vault_path / "journal" / ".metrics" / f"{month_str}.jsonl"
+    recorder = MetricsRecorder(log_path=log_path)
+    return LLMRouter(metrics_recorder=recorder)
+
+
 @dataclass
 class TaskResult:
     new_tasks_count: int
@@ -46,7 +56,7 @@ class TaskGraph:
         sensitivity: Sensitivity = "normal",
     ) -> None:
         self._vault = vault
-        self._router = router or LLMRouter()
+        self._router = router or _make_router(vault.path)
         self._sensitivity = sensitivity
         self._compiled = self._build()
 

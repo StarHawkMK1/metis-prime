@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import json
 from datetime import date, timedelta
+from pathlib import Path
 from typing import Any
 
 import structlog
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Send
 
+from ...llm.metrics import MetricsRecorder
 from ...llm.router import LLMRouter
 from ...storage.frontmatter import WikiPage
 from ...storage.vault import Vault
@@ -27,10 +29,17 @@ If no contradictions, return {"contradictions": []}.
 """
 
 
+def _make_router(vault_path: Path) -> LLMRouter:
+    month_str = date.today().strftime("%Y-%m")
+    log_path = vault_path / "journal" / ".metrics" / f"{month_str}.jsonl"
+    recorder = MetricsRecorder(log_path=log_path)
+    return LLMRouter(metrics_recorder=recorder)
+
+
 class LintGraph:
     def __init__(self, vault: Vault, router: LLMRouter | None = None) -> None:
         self._vault = vault
-        self._router = router or LLMRouter()
+        self._router = router or _make_router(vault.path)
         self._searcher = WikiSearcher(vault)
         self._compiled = self._build()
 

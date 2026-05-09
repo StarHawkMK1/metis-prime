@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import Any
 
 import structlog
 from langgraph.graph import END, START, StateGraph
 
+from ...llm.metrics import MetricsRecorder
 from ...llm.router import LLMRouter
 from ...llm.types import Sensitivity
 from ...storage.frontmatter import WikiPage
@@ -48,6 +50,13 @@ Rules: "create" if new topic; "merge" if very similar page exists (set target_pa
 """
 
 
+def _make_router(vault_path: Path) -> LLMRouter:
+    month_str = date.today().strftime("%Y-%m")
+    log_path = vault_path / "journal" / ".metrics" / f"{month_str}.jsonl"
+    recorder = MetricsRecorder(log_path=log_path)
+    return LLMRouter(metrics_recorder=recorder)
+
+
 @dataclass
 class IngestResult:
     decision: str
@@ -65,7 +74,7 @@ class IngestGraph:
         sensitivity: Sensitivity = "normal",
     ) -> None:
         self._vault = vault
-        self._router = router or LLMRouter()
+        self._router = router or _make_router(vault.path)
         self._sensitivity = sensitivity
         self._searcher = WikiSearcher(vault)
         self._compiled = self._build()
