@@ -20,3 +20,4 @@ repos:
           - "structlog>=24.1"
           - "pytest>=8.0"
           - "openai>=1.50"
+          - "fastapi>=0.111"
