@@ -87,13 +87,19 @@ class InboxHandler(FileSystemEventHandler):  # type: ignore[misc]
 class CaptureWatcher:
     """Blocking watcher daemon. Call run_forever() — stop with Ctrl+C."""
 
-    def __init__(self, watch_dirs: list[Path], inbox_path: Path) -> None:
+    def __init__(
+        self,
+        watch_dirs: list[Path],
+        inbox_path: Path,
+        extensions: set[str] | None = None,
+    ) -> None:
         self.watch_dirs = watch_dirs
         self.inbox_path = inbox_path
+        self.extensions = extensions
         self._observer: Observer | None = None
 
     def start(self) -> None:
-        handler = InboxHandler(self.inbox_path)
+        handler = InboxHandler(self.inbox_path, extensions=self.extensions)
         self._observer = Observer()
         for d in self.watch_dirs:
             if d.exists():
