@@ -19,3 +19,5 @@ def test_capture_config_defaults() -> None:
     assert s.whisper_model_size == "base"
     assert ".md" in s.capture_extensions
     assert ".pdf" in s.capture_extensions
+    assert ".m4a" in s.capture_extensions
+    assert ".wav" in s.capture_extensions

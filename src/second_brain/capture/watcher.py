@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 import structlog
-from watchdog.events import FileCreatedEvent, FileSystemEventHandler
+from watchdog.events import FileCreatedEvent, FileMovedEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
 log = structlog.get_logger(__name__)
@@ -59,10 +59,11 @@ class InboxHandler(FileSystemEventHandler):  # type: ignore[misc]
             ".webp",
         }
 
-    def on_created(self, event: FileCreatedEvent) -> None:
-        if getattr(event, "is_directory", False):
+    def _handle_path(self, src: Path) -> None:
+        """Copy *src* to inbox, routing audio to audio/. Skips symlinks and denylist paths."""
+        if src.is_symlink():
+            log.warning("capture.watcher.denied_symlink", path=str(src))
             return
-        src = Path(event.src_path)
         if src.suffix.lower() not in self.extensions:
             return
         if _is_sensitive_path(src):
@@ -82,6 +83,16 @@ class InboxHandler(FileSystemEventHandler):  # type: ignore[misc]
 
         shutil.copy2(src, dest)
         log.info("capture.watcher.copied", src=str(src), dest=str(dest))
+
+    def on_created(self, event: FileCreatedEvent) -> None:
+        if getattr(event, "is_directory", False):
+            return
+        self._handle_path(Path(event.src_path))
+
+    def on_moved(self, event: FileMovedEvent) -> None:
+        if getattr(event, "is_directory", False):
+            return
+        self._handle_path(Path(event.dest_path))
 
 
 class CaptureWatcher:

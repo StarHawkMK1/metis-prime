@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from watchdog.events import FileCreatedEvent
+from watchdog.events import FileCreatedEvent, FileMovedEvent
 
 from second_brain.capture.watcher import InboxHandler, _is_sensitive_path
 
@@ -112,3 +112,35 @@ def test_is_sensitive_path(path_str: str) -> None:
 )
 def test_is_not_sensitive_path(path_str: str) -> None:
     assert _is_sensitive_path(Path(path_str)) is False
+
+
+def test_handler_blocks_symlink(tmp_path: Path) -> None:
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    real = tmp_path / "real.md"
+    real.write_text("real content", encoding="utf-8")
+    symlink = tmp_path / "link.md"
+    try:
+        symlink.symlink_to(real)
+    except OSError:
+        pytest.skip("symlink creation requires elevated privileges on this platform")
+
+    handler = InboxHandler(inbox_path=inbox, extensions={".md"})
+    handler.on_created(FileCreatedEvent(str(symlink)))
+
+    assert not (inbox / "link.md").exists()
+
+
+def test_handler_on_moved_copies_file(tmp_path: Path) -> None:
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    src = tmp_path / "tmp_note.md"
+    src.write_text("atomic save", encoding="utf-8")
+    dest_path = tmp_path / "note.md"
+    src.rename(dest_path)
+
+    handler = InboxHandler(inbox_path=inbox, extensions={".md"})
+    handler.on_moved(FileMovedEvent(str(src), str(dest_path)))
+
+    assert (inbox / "note.md").exists()
+    assert (inbox / "note.md").read_text(encoding="utf-8") == "atomic save"
