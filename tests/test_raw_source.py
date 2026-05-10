@@ -36,3 +36,12 @@ def test_raw_source_empty_sources_list() -> None:
     md = src.to_markdown()
     post = fm.loads(md)
     assert post["sources"] == []
+
+
+def test_raw_source_updated_reflects_today() -> None:
+    from datetime import date
+
+    src = RawSource(title="Test", sources=[], body="")
+    md = src.to_markdown()
+    post = fm.loads(md)
+    assert post["updated"] == str(date.today())
