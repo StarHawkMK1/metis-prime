@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from dataclasses import field as dc_field
 from datetime import date
 from typing import Any, Literal, cast
 
@@ -64,3 +66,25 @@ class WikiPage(BaseModel):
             updated=post.get("updated", date.today()),
             body=str(post.content),
         )
+
+
+@dataclass
+class RawSource:
+    """Frontmatter wrapper for raw source files (transcripts, clips, clipboard)."""
+
+    title: str
+    sources: list[str] = dc_field(default_factory=list)
+    created: date = dc_field(default_factory=date.today)
+    body: str = ""
+
+    def to_markdown(self) -> str:
+        post = fm.Post(
+            self.body,
+            title=self.title,
+            type="ref",
+            status="draft",
+            sources=self.sources,
+            created=str(self.created),
+            updated=str(self.created),
+        )
+        return str(fm.dumps(post))
