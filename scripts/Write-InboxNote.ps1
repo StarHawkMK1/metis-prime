@@ -7,6 +7,8 @@
     Korean and other non-ASCII characters. This script writes UTF-8 without
     BOM, which Obsidian and the Python vault layer both expect.
 
+    NOTE: Pipe a single string; use backtick-n for line breaks within the content.
+
 .PARAMETER Content
     The text content to write. Accepts pipeline input.
 
@@ -27,6 +29,8 @@ param(
     [string]$FileName = "note-$(Get-Date -Format 'yyyyMMdd-HHmmss').md"
 )
 
+$ErrorActionPreference = 'Stop'
+
 $vaultPath = $env:SECOND_BRAIN_VAULT_PATH
 if (-not $vaultPath) {
     Write-Error "SECOND_BRAIN_VAULT_PATH is not set. Export it in your PowerShell profile."
@@ -38,7 +42,8 @@ if (-not (Test-Path $inboxDir)) {
     New-Item -ItemType Directory -Path $inboxDir -Force | Out-Null
 }
 
-$destPath = Join-Path $inboxDir $FileName
+$safeFileName = Split-Path -Leaf $FileName
+$destPath = Join-Path $inboxDir $safeFileName
 $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 [System.IO.File]::WriteAllText($destPath, $Content, $utf8NoBom)
 
