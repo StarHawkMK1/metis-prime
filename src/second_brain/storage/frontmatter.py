@@ -85,6 +85,6 @@ class RawSource:
             status="draft",
             sources=self.sources,
             created=str(self.created),
-            updated=str(self.created),
+            updated=str(date.today()),
         )
         return str(fm.dumps(post))
