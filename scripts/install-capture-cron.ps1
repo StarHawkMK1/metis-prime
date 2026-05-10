@@ -18,7 +18,7 @@ param(
 )
 
 $TaskName   = "MetisPrime-DailyJournal"
-$WorkingDir = (Get-Location).Path
+$WorkingDir = Split-Path -Parent $PSScriptRoot
 $Executable = "uv"
 $Arguments  = "run second-brain capture journal"
 
