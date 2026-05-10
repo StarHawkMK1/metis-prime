@@ -693,7 +693,6 @@ def capture_serve(
 @capture_app.command("clip")
 def capture_clip() -> None:
     """Save clipboard contents to raw/inbox/."""
-    from .capture.clipboard import capture_clipboard
     from .config import Settings
 
     settings = Settings()
@@ -702,6 +701,8 @@ def capture_clip() -> None:
     inbox_path.mkdir(parents=True, exist_ok=True)
 
     try:
+        from .capture.clipboard import capture_clipboard
+
         dest = capture_clipboard(inbox_path)
         console.print(f"[green]✓[/green] Saved clipboard to [bold]{dest.name}[/bold]")
     except (ValueError, ImportError) as exc:
