@@ -171,6 +171,24 @@ def test_vault_read_raw_text(tmp_vault: Path) -> None:
     assert "Content here." in text
 
 
+def test_vault_read_raw_text_korean(tmp_vault: Path) -> None:
+    source = tmp_vault / "raw" / "inbox" / "korean-note.md"
+    source.write_text("# 첫 메모\n\nAI, 업무 기록, 프로젝트 의사결정", encoding="utf-8")
+    vault = Vault(tmp_vault)
+    text = vault.read_raw_text("raw/inbox/korean-note.md")
+    assert "첫 메모" in text
+    assert "프로젝트 의사결정" in text
+
+
+def test_write_page_roundtrip_korean(tmp_vault: Path) -> None:
+    vault = Vault(tmp_vault)
+    page = WikiPage(title="AI 학습", type="concept", body="머신러닝은 AI의 하위 분야이다.")
+    vault.write_page("wiki/concepts/ai-korean.md", page)
+    loaded = vault.read_page("wiki/concepts/ai-korean.md")
+    assert loaded.title == "AI 학습"
+    assert "머신러닝" in loaded.body
+
+
 def test_vault_page_exists_true(tmp_vault: Path) -> None:
     vault = Vault(tmp_vault)
     vault.write_page("wiki/concepts/existing.md", WikiPage(title="Existing", type="concept"))
