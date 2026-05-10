@@ -22,6 +22,8 @@ review_app = typer.Typer(help="Human-in-the-loop review queue commands.")
 app.add_typer(review_app, name="review")
 cost_app = typer.Typer(help="LLM cost tracking commands.")
 app.add_typer(cost_app, name="cost")
+capture_app = typer.Typer(help="Capture layer commands.")
+app.add_typer(capture_app, name="capture")
 
 console = Console()
 
@@ -600,3 +602,135 @@ def cost_report() -> None:
     reporter = CostReporter(vault=vault, recorder=recorder)
     path = reporter.write_monthly_report()
     typer.echo(f"Cost report written to: {path}")
+
+
+# ── Capture commands ───────────────────────────────────────────────────────────
+
+
+@capture_app.command("watch")
+def capture_watch() -> None:
+    """Watch configured directories and copy new files to raw/inbox/ (blocking — Ctrl+C to stop)."""
+    from .capture.watcher import CaptureWatcher
+    from .config import Settings
+
+    settings = Settings()
+    if not settings.capture_watch_dirs:
+        console.print("[red]✗[/red] No watch directories configured.")
+        console.print("  Set SECOND_BRAIN_CAPTURE_WATCH_DIRS or add capture_watch_dirs to .env")
+        raise typer.Exit(1)
+
+    vault_path = settings.vault_path.expanduser().resolve()
+    inbox_path = vault_path / "raw" / "inbox"
+    dirs = [Path(d).expanduser().resolve() for d in settings.capture_watch_dirs]
+
+    console.print(f"[green]Watching {len(dirs)} dir(s) → {inbox_path}[/green]  (Ctrl+C to stop)")
+    for d in dirs:
+        console.print(f"  • {d}")
+
+    watcher = CaptureWatcher(
+        watch_dirs=dirs, inbox_path=inbox_path, extensions=set(settings.capture_extensions)
+    )
+    watcher.run_forever()
+
+
+@capture_app.command("transcribe")
+def capture_transcribe(
+    path: Annotated[
+        str | None, typer.Argument(help="Path to audio file. Omit to scan raw/inbox/audio/")
+    ] = None,
+) -> None:
+    """Transcribe audio file(s) using faster-whisper."""
+    from .capture.transcribe import TranscribeWorker
+    from .config import Settings
+
+    settings = Settings()
+    vault_path = settings.vault_path.expanduser().resolve()
+    worker = TranscribeWorker(vault_path=vault_path, model_size=settings.whisper_model_size)
+
+    if path:
+        result = worker.transcribe_file(Path(path))
+        console.print(
+            f"[green]✓[/green] Transcript: [bold]{result.transcript_path}[/bold]"
+            f"  ({result.duration_seconds:.1f}s, {result.language})"
+        )
+    else:
+        results = worker.process_inbox_audio()
+        if not results:
+            console.print("[yellow]No audio files found in raw/inbox/audio/[/yellow]")
+        for r in results:
+            console.print(
+                f"[green]✓[/green] {r.source_path.name} → [bold]{r.transcript_path.name}[/bold]"
+            )
+
+
+@capture_app.command("serve")
+def capture_serve(
+    port: Annotated[int | None, typer.Option("--port", "-p", help="Override clipper port")] = None,
+    host: Annotated[str | None, typer.Option("--host", help="Override bind host")] = None,
+) -> None:
+    """Start the web clipper FastAPI server (blocking — Ctrl+C to stop)."""
+    try:
+        import uvicorn
+    except ImportError as exc:
+        console.print("[red]✗[/red] uvicorn is not installed. Run: uv sync --extra capture")
+        raise typer.Exit(1) from exc
+
+    from .capture.clipper_endpoint import create_app
+    from .config import Settings
+
+    settings = Settings()
+    vault_path = settings.vault_path.expanduser().resolve()
+    bind_host = host or settings.clipper_host
+    bind_port = port or settings.clipper_port
+
+    console.print(
+        f"[green]Clipper listening on http://{bind_host}:{bind_port}[/green]  (Ctrl+C to stop)"
+    )
+    fast_app = create_app(vault_path)
+    uvicorn.run(fast_app, host=bind_host, port=bind_port)
+
+
+@capture_app.command("clip")
+def capture_clip() -> None:
+    """Save clipboard contents to raw/inbox/."""
+    from .capture.clipboard import capture_clipboard
+    from .config import Settings
+
+    settings = Settings()
+    vault_path = settings.vault_path.expanduser().resolve()
+    inbox_path = vault_path / "raw" / "inbox"
+    inbox_path.mkdir(parents=True, exist_ok=True)
+
+    try:
+        dest = capture_clipboard(inbox_path)
+        console.print(f"[green]✓[/green] Saved clipboard to [bold]{dest.name}[/bold]")
+    except (ValueError, ImportError) as exc:
+        console.print(f"[red]✗[/red] {exc}")
+        raise typer.Exit(1) from exc
+
+
+@capture_app.command("journal")
+def capture_journal(
+    date: Annotated[
+        str | None, typer.Option("--date", "-d", help="Date as YYYY-MM-DD (default: today)")
+    ] = None,
+) -> None:
+    """Generate (or locate) the daily journal file."""
+    from datetime import date as dt
+
+    from .capture.journal import generate_daily_journal
+    from .config import Settings
+
+    settings = Settings()
+    vault_path = settings.vault_path.expanduser().resolve()
+
+    target: dt | None = None
+    if date:
+        try:
+            target = dt.fromisoformat(date)
+        except ValueError as exc:
+            console.print(f"[red]✗[/red] Invalid date format: {date!r}. Use YYYY-MM-DD.")
+            raise typer.Exit(1) from exc
+
+    path = generate_daily_journal(vault_path, for_date=target)
+    console.print(f"[green]✓[/green] Journal: [bold]{path}[/bold]")
