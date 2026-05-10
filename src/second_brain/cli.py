@@ -30,6 +30,7 @@ console = Console()
 _VAULT_DIRS = [
     "_meta",
     "raw/inbox",
+    "raw/inbox/audio",
     "raw/clips",
     "raw/transcripts",
     "raw/screenshots",
@@ -43,6 +44,9 @@ _VAULT_DIRS = [
     "tasks",
     "journal",
     "graph",
+    "human_review/pending",
+    "human_review/accepted",
+    "human_review/rejected",
 ]
 
 _VAULT_GITIGNORE = """\

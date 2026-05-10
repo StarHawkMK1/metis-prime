@@ -21,3 +21,12 @@ class Settings(BaseSettings):
         default="http://localhost:4000"
     )
     litellm_master_key: SecretStr | None = Field(default=None)
+
+    # Capture layer
+    capture_watch_dirs: list[Path] = Field(default_factory=list)
+    capture_extensions: list[str] = Field(
+        default_factory=lambda: [".md", ".pdf", ".txt", ".png", ".jpg", ".jpeg", ".webp"]
+    )
+    clipper_port: int = 7331
+    clipper_host: str = "127.0.0.1"
+    whisper_model_size: str = "base"
